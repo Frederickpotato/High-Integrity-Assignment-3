@@ -3,6 +3,10 @@ use Ada.Numerics.Big_Numbers.Big_Reals;
 with Spatial;
 with Vector;
 
+--  TASK 1 — read preconditions on Get_*, Add_Item, Tick, Reflect_* below.
+--  TASK 2 — Init and Add_Item contracts; implement bodies in universe.adb.
+--  TASK 3 — Tick contract; implement body (with loop invariants) in universe.adb.
+
 generic
    Max_Items : Positive;
 
@@ -29,8 +33,9 @@ package Universe with SPARK_Mode is
      with Pre => Index >= 1 and then Index <= Item_Count (U);
 
 
-   procedure Init (U : out Universe);
-   --  TODO: add postcondition
+   procedure Init (U : out Universe)
+     with
+       Post => Item_Count (U) = 0;
 
    procedure Add_Item
      (U   : in out Universe;
@@ -38,11 +43,27 @@ package Universe with SPARK_Mode is
       vel : Spatial.Velocity;
       rad : Big_Real)
      with
-       Pre  => Item_Count (U) < Max_Items;
-   --  TODO: add postcondition
+       Pre  => Item_Count (U) < Max_Items,
+       Post =>
+         Item_Count (U) = Item_Count (U'Old) + 1
+         and then Get_Position (U, Item_Count (U)) = pos
+         and then Get_Velocity (U, Item_Count (U)) = vel
+         and then Get_Radius   (U, Item_Count (U)) = rad
+         and then (for all I in 1 .. Item_Count (U'Old) =>
+                     Get_Position (U, I) = Get_Position (U'Old, I)
+                     and then Get_Velocity (U, I) = Get_Velocity (U'Old, I)
+                     and then Get_Radius   (U, I) = Get_Radius   (U'Old, I));
 
-   procedure Tick (U : in out Universe);
-   --  TODO: add postcondition
+   procedure Tick (U : in out Universe)
+     with
+       Post =>
+         Item_Count (U) = Item_Count (U'Old)
+         and then (for all I in 1 .. Item_Count (U) =>
+                     Get_Position (U, I) =
+                       Spatial.Move (Get_Position (U'Old, I),
+                                     Get_Velocity (U'Old, I))
+                     and then Get_Velocity (U, I) = Get_Velocity (U'Old, I)
+                     and then Get_Radius   (U, I) = Get_Radius   (U'Old, I));
 
    procedure Reflect_Velocity_X
      (U : in out Universe; Index : Integer)
