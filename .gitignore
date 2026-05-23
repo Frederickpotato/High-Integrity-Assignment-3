@@ -1,0 +1,13 @@
+# Alire / gprbuild outputs
+/obj/
+/bin/
+/lib/
+
+# Local Alire cache (not the tracked alire.toml / alire.lock)
+/alire/local/
+/alire/cache/
+
+# Editor and OS
+.vscode/
+.DS_Store
+*~
