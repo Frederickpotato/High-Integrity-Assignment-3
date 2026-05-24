@@ -6,6 +6,31 @@ package Collision_Math with SPARK_Mode is
 
    use type Vector.Vector;
 
+   --  -----------------------------------------------------------------
+   --  TASK 5 / TASK 6 GUIDELINE (comment-only helper)
+   --  -----------------------------------------------------------------
+   --  This package is the main place to connect your report proof steps
+   --  to SPARK contracts.
+   --
+   --  Suggested workflow for Task 5:
+   --  1) Treat Will_Collide_Vec as the executable/spec predicate for
+   --     "will these two trajectories ever violate Eps2?".
+   --  2) Use Sq_Dist_At_Vec as your canonical math expression for
+   --     squared distance at time T >= 0.
+   --  3) Show the implication in code by calling Check_Implies_Safe_Vec
+   --     from a ghost context with suitable Pre facts.
+   --
+   --  Suggested workflow for Task 6:
+   --  1) Bridge program-state vectors (positions/velocities from Universe)
+   --     to the vector theorem via Lemma_Sq_Dist_Bridge.
+   --  2) In the caller (usually main loop ghost checks), first assert the
+   --     linear motion form P = Init + Vel * T.
+   --  3) Then apply Check_Implies_Safe_Vec to conclude strict separation
+   --     (> Eps2) for the time of interest.
+   --
+   --  Practical tip: keep these proof steps in Ghost procedures/functions
+   --  so runtime behavior stays unchanged while gnatprove gets the facts.
+
    --  Vector-level collision check: given the position difference S
    --  and velocity difference V between two items, determines whether
    --  they will ever come within squared distance Eps2 of each other.

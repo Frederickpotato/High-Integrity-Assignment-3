@@ -76,6 +76,7 @@
 with Universe;
 with Spatial;
 with Vector; use Vector;
+with Collision_Math;
 with Display;
 with Ada.Text_IO;
 with Ada.Numerics.Big_Numbers.Big_Reals;
@@ -158,11 +159,38 @@ procedure Main with SPARK_Mode is
         (Initial_Radii (I) + Initial_Radii (J))) with
       Pre => I in 1 .. 2 and then J in 1 .. 2;
 
+   --  Task 5 : TODO — collision check for one pair based on Collision_Math.
+     function No_Future_Collision_Pair (I, J : Integer) return Boolean is
+      (not Collision_Math.Will_Collide_Vec
+          (S    => Vector.Sub
+                     (Spatial.To_Vector (Initial_Positions (I)),
+                      Spatial.To_Vector (Initial_Positions (J))),
+           V    => Vector.Sub
+                     (Spatial.Vel_To_Vector (Initial_Velocities (I)),
+                      Spatial.Vel_To_Vector (Initial_Velocities (J))),
+           Eps2 => Pair_Sep2 (I, J)))
+     with
+       Pre => I in 1 .. 2 and then J in 1 .. 2;
+   --
+   --  What each input means:
+   --    S    = initial relative position (item I minus item J)
+   --    V    = relative velocity (item I minus item J)
+   --    Eps2 = squared collision threshold from pair radii
+
    --  Task 4 (3.4): TODO — prove no future collision for one pair.
    --  TODO: define No_Future_Collision_Pair
+   --  Task 5/6 guide:
+   --    This is a good place to compute S, V, and Eps2 for one pair,
+   --    call Collision_Math.Check_Implies_Safe_Vec in Ghost code,
+   --    and return the boolean fact used by assertions below.
 
    --  Task 4 (3.4): TODO — ghost lemma linking pairs to Collision_Math.
    --  TODO: define Lemma_No_Collision_Pair
+   --  Task 5/6 guide:
+   --    Keep this as a small ghost wrapper that:
+   --    1) derives vector differences from Universe state,
+   --    2) invokes Collision_Math bridge/soundness lemmas,
+   --    3) exports an easy-to-use postcondition for the loop.
 
    --  Provided — wall-bounce detection (not part of your Task 4 proof).
    type Bounce_Flags is record
@@ -262,23 +290,30 @@ procedure Main with SPARK_Mode is
    --  Uses Task 2 (Init/Add_Item) and Task 3 (Tick) via Univ.Tick below.
    --  Task 4 TODOs: pre-loop check, in-loop assert, post-bounce check.
    --  -----------------------------------------------------------------
+   
+
 begin
    Reset_Universe;
 
-   --  Task 4 (3.4): TODO — check no collision before the loop starts.
-   --  TODO: add pre-loop collision check
+   pragma Assert (Position_Invariant (U));
+
+   if not No_Future_Collision_Pair (1, 2) then --Collision check before the loop starts
+      return;
+   end if;
 
    for Frame in 1 .. 5000 loop
       pragma Loop_Invariant (Univ.Item_Count (U) = 2);
       pragma Loop_Invariant (Tick_Count >= To_Big_Real (0));
       pragma Loop_Invariant (Position_Invariant (U));
+      pragma Loop_Invariant (No_Future_Collision_Pair (1, 2)); --Collision check for the loop invariant
 
-      --  Task 4 (3.4): TODO — assert collision freedom each frame.
-      --  TODO: call soundness lemma and assert collision freedom
+      pragma Assert (No_Future_Collision_Pair (1, 2)); --Collision check for the assertion
 
       Disp.Capture (U);
       Univ.Tick (U);  --  Task 3 — advances every item one tick
       Tick_Count := Tick_Count + To_Big_Real (1);
+
+      pragma Assert (Position_Invariant (U));
 
       declare
          Flags : constant Bounce_Array := Detect_Bounces (U);
@@ -304,8 +339,15 @@ begin
 
             Reset_Universe;
 
+            if not No_Future_Collision_Pair (1, 2) then --Collision check after the bounce
+               exit;
+            end if;
+
             --  Task 4 (3.4): TODO — re-check after wall bounce + reset.
             --  TODO: add post-bounce collision check
+            --  Task 5/6 guide:
+            --    Re-establish ghost assumptions after reset (new initial
+            --    position/velocity baseline) before continuing the loop.
          end if;
       end;
    end loop;
