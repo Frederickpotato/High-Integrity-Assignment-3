@@ -177,20 +177,60 @@ procedure Main with SPARK_Mode is
    --    V    = relative velocity (item I minus item J)
    --    Eps2 = squared collision threshold from pair radii
 
-   --  Task 4 (3.4): TODO — prove no future collision for one pair.
-   --  TODO: define No_Future_Collision_Pair
-   --  Task 5/6 guide:
-   --    This is a good place to compute S, V, and Eps2 for one pair,
-   --    call Collision_Math.Check_Implies_Safe_Vec in Ghost code,
-   --    and return the boolean fact used by assertions below.
+    --  Task 6.1 skeleton — soundness lemma for one pair.
+    procedure Lemma_No_Collision_Pair
+       (U : Univ.Universe; I, J : Integer)
+    with
+         Ghost,
+         Pre  => Position_Invariant (U)
+                     and then I in 1 .. 2
+                     and then J in 1 .. 2
+                     and then Tick_Count >= To_Big_Real (0)
+                     and then No_Future_Collision_Pair (I, J),
+         Post => Squared_Dist (U, I, J) > Pair_Sep2 (I, J);
 
-   --  Task 4 (3.4): TODO — ghost lemma linking pairs to Collision_Math.
-   --  TODO: define Lemma_No_Collision_Pair
-   --  Task 5/6 guide:
-   --    Keep this as a small ghost wrapper that:
-   --    1) derives vector differences from Universe state,
-   --    2) invokes Collision_Math bridge/soundness lemmas,
-   --    3) exports an easy-to-use postcondition for the loop.
+    procedure Lemma_No_Collision_Pair
+       (U : Univ.Universe; I, J : Integer) is
+         P1 : constant Vector.Vector := -- current position of item I as a vector
+            Spatial.To_Vector (Univ.Get_Position (U, I));
+         P2 : constant Vector.Vector := -- current position of item J as a vector
+            Spatial.To_Vector (Univ.Get_Position (U, J));
+         Init1 : constant Vector.Vector := -- initial position of item I as a vector
+            Spatial.To_Vector (Initial_Positions (I));
+         Init2 : constant Vector.Vector := -- initial position of item J as a vector
+            Spatial.To_Vector (Initial_Positions (J));
+         Vel1 : constant Vector.Vector := -- velocity of item I as a vector
+            Spatial.Vel_To_Vector (Initial_Velocities (I));
+         Vel2 : constant Vector.Vector := -- velocity of item J as a vector
+            Spatial.Vel_To_Vector (Initial_Velocities (J));
+         S : constant Vector.Vector := Vector.Sub (Init1, Init2); -- initial relative position
+         V : constant Vector.Vector := Vector.Sub (Vel1, Vel2); -- relative velocity
+         Eps2 : constant Big_Real := Pair_Sep2 (I, J);
+    begin
+             --  Current positions are linear evolution from the baseline state.
+             pragma Assert
+                (P1 = Vector.Add (Init1, Vector.Scale (Vel1, Tick_Count))); -- expected position from initial + velocity * time
+             pragma Assert
+                (P2 = Vector.Add (Init2, Vector.Scale (Vel2, Tick_Count))); -- expected position from initial + velocity * time
+
+             --  Bridge current squared distance to vector-level distance at T.
+             Collision_Math.Lemma_Sq_Dist_Bridge 
+                (P1, P2, Init1, Init2, Vel1, Vel2, Tick_Count);
+
+             --  Convert the pair predicate into the theorem precondition.
+             pragma Assert (not Collision_Math.Will_Collide_Vec (S, V, Eps2));
+
+             --  Apply soundness theorem: no future collision => strict separation.
+             Collision_Math.Check_Implies_Safe_Vec (S, V, Eps2, Tick_Count);
+
+             --  Link theorem result back to Squared_Dist helper used in main.
+             pragma Assert
+                (Vector.Dot (Vector.Sub (P1, P2), Vector.Sub (P1, P2)) =
+                     Squared_Dist (U, I, J));
+             pragma Assert
+                (Squared_Dist (U, I, J) =
+                     Collision_Math.Sq_Dist_At_Vec (S, V, Tick_Count));
+    end Lemma_No_Collision_Pair;
 
    --  Provided — wall-bounce detection (not part of your Task 4 proof).
    type Bounce_Flags is record
@@ -297,23 +337,25 @@ begin
 
    pragma Assert (Position_Invariant (U));
 
-   if not No_Future_Collision_Pair (1, 2) then --Collision check before the loop starts
+   if not No_Future_Collision_Pair (1, 2) then --Collision check before the loop starts. If it does abort
       return;
    end if;
 
    for Frame in 1 .. 5000 loop
-      pragma Loop_Invariant (Univ.Item_Count (U) = 2);
-      pragma Loop_Invariant (Tick_Count >= To_Big_Real (0));
-      pragma Loop_Invariant (Position_Invariant (U));
+      pragma Loop_Invariant (Univ.Item_Count (U) = 2); -- The number of items in the universe should always be 2
+      pragma Loop_Invariant (Tick_Count >= To_Big_Real (0));-- The tick count should always be non-negative
+      pragma Loop_Invariant (Position_Invariant (U)); 
       pragma Loop_Invariant (No_Future_Collision_Pair (1, 2)); --Collision check for the loop invariant
 
-      pragma Assert (No_Future_Collision_Pair (1, 2)); --Collision check for the assertion
+      Lemma_No_Collision_Pair (U, 1, 2); --Collision check for the loop invariant using the lemma
+      pragma Assert (Squared_Dist(U, 1, 2) > Pair_Sep2 (1, 2)); --Collision check for the assertion
+
+  
 
       Disp.Capture (U);
       Univ.Tick (U);  --  Task 3 — advances every item one tick
       Tick_Count := Tick_Count + To_Big_Real (1);
 
-      pragma Assert (Position_Invariant (U));
 
       declare
          Flags : constant Bounce_Array := Detect_Bounces (U);
@@ -337,7 +379,7 @@ begin
               (Univ.Get_Velocity (U, 1),
                Univ.Get_Velocity (U, 2));
 
-            Reset_Universe;
+            Reset_Universe; 
 
             if not No_Future_Collision_Pair (1, 2) then --Collision check after the bounce
                exit;
