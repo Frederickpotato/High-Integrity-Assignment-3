@@ -1,12 +1,8 @@
---  =====================================================================
---  SWEN90010 Assignment 3 — main.adb
---  Authors: Marlon Paththamperuma 1173217, <NAME 2> (<student ID>)
---  =====================================================================
+--  Authors: Marlon Paththamperuma 1173217, Christopher Siang 1270328
 --
---  TASK 1 — Code understanding (written answers below; no code changes)
+--  TASK 1 — Code understanding
 --
---  Q1. Why does Spatial define separate Position and Velocity types,
---      both derived from Vector.Vector?
+--  Q1:
 --
 --  Advantage:
 --    Although Position and Velocity share the same underlying record
@@ -38,9 +34,7 @@
 --    the second because "+" is not defined between Position and
 --    Velocity
 
---  Q2. Several procedures in universe.ads have preconditions.
---      For each one, explain why it is needed and what runtime
---      error could occur if it were removed.
+--  Q2:
 --
 --  Precondition 1: Index >= 1 and then Index <= Item_Count (U)
 --    Used by: Get_Position, Get_Velocity, Get_Radius,
@@ -80,9 +74,6 @@
 --  the No_Future_Collision_Pair would be using the Will_Collide_Vec predicate to check for a future collision and 
 --  return false and cause an early halt but a collision would not have occured in that trajectory
 -- thus not proving a collision will definitely happen in the future.
---  ---------------------------------------------------------------------
---  Provided simulation driver (Tasks 2–3 verification, Task 4 extension)
---  ---------------------------------------------------------------------
 --
 with Universe;
 with Spatial;
@@ -125,23 +116,16 @@ procedure Main with SPARK_Mode is
 
    Tick_Count : Big_Real := To_Big_Real (0);
 
-   --  -----------------------------------------------------------------
-   --  TASK 4 — Collision-freedom proofs (Section 3.4)
-   --  -----------------------------------------------------------------
-
-   --  Task 4 (3.4): expected position at the current tick, derived from
-   --  the position/velocity captured at the most recent bounce (or
-   --  simulation start) plus velocity * Tick_Count.
+   -- Expected_Position is a helper function for the Position Invariant
    function Expected_Position (Item : Integer) return Spatial.Position is
      (Spatial.To_Position
         (Vector.Add
            (Spatial.To_Vector (Initial_Positions (Item)),
-            Vector.Scale
-              (Spatial.Vel_To_Vector (Initial_Velocities (Item)),
-               Tick_Count))))
+            Vector.Scale(Spatial.Vel_To_Vector (Initial_Velocities (Item)), 
+                        Tick_Count))))
      with Pre => Item in 1 .. 2;
 
-   --  Task 4 (3.4): position invariant used in the main loop and by gnatprove.
+   --  Task 4 Define Position Invariant
    function Position_Invariant (U : Univ.Universe) return Boolean is
      (Univ.Item_Count (U) = 2
       and then Tick_Count >= To_Big_Real (0)
@@ -150,7 +134,6 @@ procedure Main with SPARK_Mode is
                   and then Univ.Get_Velocity (U, I) = Initial_Velocities (I)
                   and then Univ.Get_Radius (U, I) = Initial_Radii (I)));
 
-   --  Task 4 (3.4): helper — squared distance between two items.
    function Squared_Dist
      (U : Univ.Universe; I, J : Integer) return Big_Real is
        (Vector.Dot
@@ -163,15 +146,15 @@ procedure Main with SPARK_Mode is
       Pre => I >= 1 and then I <= Univ.Item_Count (U)
              and then J >= 1 and then J <= Univ.Item_Count (U);
 
-   --  Task 4 (3.4): helper — squared minimum separation for a pair.
    function Pair_Sep2
      (I, J : Integer) return Big_Real is
        ((Initial_Radii (I) + Initial_Radii (J)) *
         (Initial_Radii (I) + Initial_Radii (J))) with
       Pre => I in 1 .. 2 and then J in 1 .. 2;
 
-   --  Task 5 : TODO — collision check for one pair based on Collision_Math.
-     function No_Future_Collision_Pair (I, J : Integer) return Boolean is
+
+   -- Task 5 - Define No_Future_Collision_Pair
+   function No_Future_Collision_Pair (I, J : Integer) return Boolean is
       (not Collision_Math.Will_Collide_Vec
           (S    => Vector.Sub
                      (Spatial.To_Vector (Initial_Positions (I)),
@@ -182,13 +165,8 @@ procedure Main with SPARK_Mode is
            Eps2 => Pair_Sep2 (I, J)))
      with
        Pre => I in 1 .. 2 and then J in 1 .. 2;
-   --
-   --  What each input means:
-   --    S    = initial relative position (item I minus item J)
-   --    V    = relative velocity (item I minus item J)
-   --    Eps2 = squared collision threshold from pair radii
 
-    --  Task 6.1 skeleton — soundness lemma for one pair.
+    --  Task 6 - Define Lemma_No_Collision_Pair
     procedure Lemma_No_Collision_Pair
        (U : Univ.Universe; I, J : Integer)
     with
@@ -197,44 +175,39 @@ procedure Main with SPARK_Mode is
                      and then I in 1 .. 2
                      and then J in 1 .. 2
                      and then Tick_Count >= To_Big_Real (0)
-                     and then No_Future_Collision_Pair (I, J),
+                     and then No_Future_Collision_Pair (I, J), 
          Post => Squared_Dist (U, I, J) > Pair_Sep2 (I, J);
 
     procedure Lemma_No_Collision_Pair
        (U : Univ.Universe; I, J : Integer) is
-         P1 : constant Vector.Vector := -- current position of item I as a vector
+         P1 : constant Vector.Vector :=
             Spatial.To_Vector (Univ.Get_Position (U, I));
-         P2 : constant Vector.Vector := -- current position of item J as a vector
+         P2 : constant Vector.Vector :=
             Spatial.To_Vector (Univ.Get_Position (U, J));
-         Init1 : constant Vector.Vector := -- initial position of item I as a vector
+         Init1 : constant Vector.Vector :=
             Spatial.To_Vector (Initial_Positions (I));
-         Init2 : constant Vector.Vector := -- initial position of item J as a vector
+         Init2 : constant Vector.Vector :=
             Spatial.To_Vector (Initial_Positions (J));
-         Vel1 : constant Vector.Vector := -- velocity of item I as a vector
+         Vel1 : constant Vector.Vector :=
             Spatial.Vel_To_Vector (Initial_Velocities (I));
-         Vel2 : constant Vector.Vector := -- velocity of item J as a vector
+         Vel2 : constant Vector.Vector :=
             Spatial.Vel_To_Vector (Initial_Velocities (J));
-         S : constant Vector.Vector := Vector.Sub (Init1, Init2); -- initial relative position
-         V : constant Vector.Vector := Vector.Sub (Vel1, Vel2); -- relative velocity
+         S : constant Vector.Vector := Vector.Sub (Init1, Init2);
+         V : constant Vector.Vector := Vector.Sub (Vel1, Vel2);
          Eps2 : constant Big_Real := Pair_Sep2 (I, J);
     begin
-             --  Current positions are linear evolution from the baseline state.
              pragma Assert
-                (P1 = Vector.Add (Init1, Vector.Scale (Vel1, Tick_Count))); -- expected position from initial + velocity * time
+                (P1 = Vector.Add (Init1, Vector.Scale (Vel1, Tick_Count)));
              pragma Assert
-                (P2 = Vector.Add (Init2, Vector.Scale (Vel2, Tick_Count))); -- expected position from initial + velocity * time
+                (P2 = Vector.Add (Init2, Vector.Scale (Vel2, Tick_Count)));
 
-             --  Bridge current squared distance to vector-level distance at T.
              Collision_Math.Lemma_Sq_Dist_Bridge 
                 (P1, P2, Init1, Init2, Vel1, Vel2, Tick_Count);
 
-             --  Convert the pair predicate into the theorem precondition.
              pragma Assert (not Collision_Math.Will_Collide_Vec (S, V, Eps2));
 
-             --  Apply soundness theorem: no future collision => strict separation.
              Collision_Math.Check_Implies_Safe_Vec (S, V, Eps2, Tick_Count);
 
-             --  Link theorem result back to Squared_Dist helper used in main.
              pragma Assert
                 (Vector.Dot (Vector.Sub (P1, P2), Vector.Sub (P1, P2)) =
                      Squared_Dist (U, I, J));
@@ -243,7 +216,6 @@ procedure Main with SPARK_Mode is
                      Collision_Math.Sq_Dist_At_Vec (S, V, Tick_Count));
     end Lemma_No_Collision_Pair;
 
-   --  Provided — wall-bounce detection (not part of your Task 4 proof).
    type Bounce_Flags is record
       X : Boolean := False;
       Y : Boolean := False;
@@ -313,6 +285,7 @@ procedure Main with SPARK_Mode is
 
    procedure Reset_Universe
      with
+      --Task 4 PostConditions for Reset_Universe
        Post =>
          Univ.Item_Count (U) = 2
          and then Tick_Count = To_Big_Real (0)
@@ -320,7 +293,7 @@ procedure Main with SPARK_Mode is
                      Univ.Get_Position (U, I) = Initial_Positions (I)
                      and then Univ.Get_Velocity (U, I) = Initial_Velocities (I)
                      and then Univ.Get_Radius (U, I) = Initial_Radii (I))
-         and then Position_Invariant (U);
+         and then Position_Invariant (U); -- Task 4 Adding Position Invariant to the PostConditions
 
    procedure Reset_Universe is
    begin
@@ -336,37 +309,80 @@ procedure Main with SPARK_Mode is
                      Initial_Radii (2));
    end Reset_Universe;
 
-   --  -----------------------------------------------------------------
-   --  Main simulation loop
-   --  Uses Task 2 (Init/Add_Item) and Task 3 (Tick) via Univ.Tick below.
-   --  Task 4 TODOs: pre-loop check, in-loop assert, post-bounce check.
-   --  -----------------------------------------------------------------
-   
-
 begin
    Reset_Universe;
 
-
-   if not No_Future_Collision_Pair (1, 2) then --Collision check before the loop starts. If it does abort
+   if not No_Future_Collision_Pair (1, 2) then --Task 5 - Add collision check before the loop
       return;
    end if;
 
    for Frame in 1 .. 5000 loop
-      pragma Loop_Invariant (Univ.Item_Count (U) = 2); -- The number of items in the universe should always be 2
-      pragma Loop_Invariant (Tick_Count >= To_Big_Real (0));-- The tick count should always be non-negative
-      pragma Loop_Invariant (Position_Invariant (U)); 
-      pragma Loop_Invariant (No_Future_Collision_Pair (1, 2)); --Collision check for the loop invariant
+    -- Task 4 Adding Loop Invariants
+      pragma Loop_Invariant (Univ.Item_Count (U) = 2); 
+      pragma Loop_Invariant (Tick_Count >= To_Big_Real (0));
+      pragma Loop_Invariant (Position_Invariant (U)); -- Task 4 Adding Position Invariant to the Loop Invariant
+      pragma Loop_Invariant (No_Future_Collision_Pair (1, 2)); --Task 5 - Add collision check to the Loop Invariant
 
-      Lemma_No_Collision_Pair (U, 1, 2); --Collision check for the loop invariant using the lemma
-      pragma Assert (Squared_Dist(U, 1, 2) > Pair_Sep2 (1, 2)); --Collision check for the assertion
+      Lemma_No_Collision_Pair (U, 1, 2); 
+      pragma Assert (Squared_Dist(U, 1, 2) > Pair_Sep2 (1, 2)); 
 
   
 
       Disp.Capture (U);
-      Univ.Tick (U);  --  Task 3 — advances every item one tick
+      Univ.Tick (U);
+
+      declare
+         T  : constant Big_Real := Tick_Count;
+         T1 : constant Big_Real := T + To_Big_Real (1);
+      begin
+         for I in 1 .. 2 loop
+            pragma Loop_Invariant (Univ.Item_Count (U) = 2);
+            pragma Loop_Invariant
+              (for all K in I .. 2 =>
+                 Spatial.To_Vector (Univ.Get_Position (U, K)) =
+                   Vector.Add
+                     (Spatial.To_Vector (Initial_Positions (K)),
+                      Vector.Add
+                        (Vector.Scale
+                           (Spatial.Vel_To_Vector
+                              (Initial_Velocities (K)), T),
+                         Spatial.Vel_To_Vector
+                           (Initial_Velocities (K)))));
+            pragma Loop_Invariant
+              (for all K in 1 .. I - 1 =>
+                 Univ.Get_Position (U, K) =
+                   Spatial.To_Position
+                     (Vector.Add
+                        (Spatial.To_Vector (Initial_Positions (K)),
+                         Vector.Scale
+                           (Spatial.Vel_To_Vector
+                              (Initial_Velocities (K)), T1))));
+            declare
+               Init_V : constant Vector.Vector :=
+                 Spatial.To_Vector (Initial_Positions (I));
+               Vel_V  : constant Vector.Vector :=
+                 Spatial.Vel_To_Vector (Initial_Velocities (I));
+               Pos_V  : constant Vector.Vector :=
+                 Spatial.To_Vector (Univ.Get_Position (U, I));
+               Target : constant Vector.Vector :=
+                 Vector.Add (Init_V, Vector.Scale (Vel_V, T1));
+            begin
+               pragma Assert (Pos_V.X = Init_V.X + Vel_V.X * T + Vel_V.X);
+               pragma Assert (Pos_V.Y = Init_V.Y + Vel_V.Y * T + Vel_V.Y);
+               pragma Assert (Pos_V.X = Init_V.X + Vel_V.X * T1);
+               pragma Assert (Pos_V.Y = Init_V.Y + Vel_V.Y * T1);
+               pragma Assert (Pos_V.X = Target.X);
+               pragma Assert (Pos_V.Y = Target.Y);
+               pragma Assert (Pos_V = Target);
+               pragma Assert
+                 (Univ.Get_Position (U, I) = Spatial.To_Position (Target));
+            end;
+         end loop;
+      end;
+
       Tick_Count := Tick_Count + To_Big_Real (1);
 
-      pragma Assert (Position_Invariant (U));
+      pragma Assert (Position_Invariant (U)); -- Task 4 Position_Invariant restored after Tick.
       declare
          Flags : constant Bounce_Array := Detect_Bounces (U);
       begin
@@ -391,21 +407,14 @@ begin
 
             Reset_Universe; 
 
-            if not No_Future_Collision_Pair (1, 2) then --Collision check after the bounce
+            if not No_Future_Collision_Pair (1, 2) then --Task 5 - Add collision check 
                exit;
             end if;
-
-            --  Task 4 (3.4): TODO — re-check after wall bounce + reset.
-            --  TODO: add post-bounce collision check
-            --  Task 5/6 guide:
-            --    Re-establish ghost assumptions after reset (new initial
-            --    position/velocity baseline) before continuing the loop.
          end if;
       end;
    end loop;
 
-   --  Task 3 verification — build (alr build) and run (alr run) to produce
-   --  simulation.html; open in a browser to compare with the reference.
+ 
    Disp.Capture (U);
    Disp.Save ("simulation.html",
               Arena_X_Min, Arena_X_Max,
