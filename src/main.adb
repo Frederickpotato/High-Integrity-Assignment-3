@@ -1,6 +1,6 @@
 --  =====================================================================
 --  SWEN90010 Assignment 3 — main.adb
---  Authors: <NAME 1> (<student ID>), <NAME 2> (<student ID>)
+--  Authors: Marlon Paththamperuma 1173217, <NAME 2> (<student ID>)
 --  =====================================================================
 --
 --  TASK 1 — Code understanding (written answers below; no code changes)
@@ -68,7 +68,18 @@
 --    end of the array. Both of these crash at runtime with
 --    Constraint_Error. The precondition prevents Add_Item from
 --    ever being called when there is no room left.
+--    
 --
+--  Task 7: The proof does not show that an early halt will result in a future collision.
+--  In the implementation in the main loop, future collisions are checked with No_Future_Collision_Pair
+--  which uses the Will_collide_Vec predicate. It's called after a bounce is detected
+-- and the universe is reset and at the initial stage of the universe. If it returns false, it comes to a halt.
+--  Will_Collide_Vec is the provided predicate to check for future collisions but doesn't
+--  verify that one or both items will collide with a wall before the future collision. So,
+--  if the items are on a trajectory that would lead to a future collision but would've collided with a wall first,
+--  the No_Future_Collision_Pair would be using the Will_Collide_Vec predicate to check for a future collision and 
+--  return false and cause an early halt but a collision would not have occured in that trajectory
+-- thus not proving a collision will definitely happen in the future.
 --  ---------------------------------------------------------------------
 --  Provided simulation driver (Tasks 2–3 verification, Task 4 extension)
 --  ---------------------------------------------------------------------
@@ -335,7 +346,6 @@ procedure Main with SPARK_Mode is
 begin
    Reset_Universe;
 
-   pragma Assert (Position_Invariant (U));
 
    if not No_Future_Collision_Pair (1, 2) then --Collision check before the loop starts. If it does abort
       return;
@@ -356,7 +366,7 @@ begin
       Univ.Tick (U);  --  Task 3 — advances every item one tick
       Tick_Count := Tick_Count + To_Big_Real (1);
 
-
+      pragma Assert (Position_Invariant (U));
       declare
          Flags : constant Bounce_Array := Detect_Bounces (U);
       begin
